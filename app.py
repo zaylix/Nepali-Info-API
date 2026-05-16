@@ -12,9 +12,18 @@ DB_URL = "https://github.com/zaylix/nepali-number-info-api/raw/refs/heads/master
 API_KEY = "diwazz"
 
 # Global variable to store the indexed database
-# We use a dictionary for O(1) lookup time
 indexed_db = {}
 is_loading = False
+
+def validate_nepali_number(number: str):
+    """Validates if the number is a valid 10-digit Nepali mobile number."""
+    if not number.isdigit() or len(number) != 10:
+        return False
+    
+    prefix = number[:3]
+    # Common Nepali prefixes: NTC (984, 985, 986, 974, 975, 976, 972), Ncell (980, 981, 982), Smart (961, 962, 988)
+    valid_prefixes = ["984", "985", "986", "974", "975", "976", "972", "980", "981", "982", "961", "962", "988"]
+    return prefix in valid_prefixes
 
 def load_and_index_db():
     global indexed_db, is_loading
@@ -24,12 +33,10 @@ def load_and_index_db():
         response = requests.get(DB_URL)
         if response.status_code == 200:
             data = response.json()
-            # Indexing by mobile number
             new_index = {}
             for entry in data:
                 mobile = entry.get("mobile")
                 if mobile:
-                    # If multiple entries for same number, we store them in a list
                     if mobile not in new_index:
                         new_index[mobile] = []
                     new_index[mobile].append(entry)
@@ -59,6 +66,14 @@ def home():
 def get_info(key, number):
     if key != API_KEY:
         return jsonify({"success": False, "message": "Invalid API Key"}), 403
+    
+    # Validate Nepali Number
+    if not validate_nepali_number(number):
+        return jsonify({
+            "success": False, 
+            "message": "Invalid Only Number for Nepali",
+            "number": number
+        }), 400
     
     if is_loading and not indexed_db:
         return jsonify({"success": False, "message": "Database is still loading, please try again in a few seconds"}), 503
